@@ -1,0 +1,51 @@
+diff --git a/Objects/pointerobject.c b/Objects/pointerobject.c
+index 8416296470..c4d9833a12 100644
+--- a/Objects/pointerobject.c
++++ b/Objects/pointerobject.c
+@@ -6,12 +6,13 @@
+ 
+ PyObject *PyPointer_New(PyObject *ob) {
+     assert(ob != NULL);
+-    PyPointerObject *pointer = PyObject_New(PyPointerObject, &PyPointer_Type);
++    PyPointerObject *pointer = PyObject_GC_New(PyPointerObject, &PyPointer_Type);
+     if (pointer == NULL) {
+         return NULL;
+     }
+     pointer->pointee = ob;
+     Py_INCREF(ob);
++    PyObject_GC_Track(pointer);
+     return _PyObject_CAST(pointer);
+ }
+ 
+@@ -47,10 +48,20 @@ error:
+ }
+ 
+ static void pointer_dealloc(PyPointerObject *pointer) {
++    PyObject_GC_UnTrack(pointer);
+     Py_CLEAR(pointer->pointee);
+-    PyObject_Del(pointer);
++    PyObject_GC_Del(pointer);
+ }
+ 
++static int pointer_traverse(PyPointerObject *o, visitproc visit, void *arg) {
++    Py_VISIT(o->pointee);
++    return 0;
++}
++
++static int pointer_clear(PyPointerObject *self) {
++    Py_CLEAR(self->pointee);
++    return 0;
++}
+ 
+ PyTypeObject PyPointer_Type = {
+     PyObject_HEAD_INIT(&PyType_Type)
+@@ -58,5 +69,8 @@ PyTypeObject PyPointer_Type = {
+     .tp_basicsize = sizeof(PyPointerObject),
+     .tp_repr = (reprfunc)pointer_repr,
+     .tp_dealloc = (destructor)pointer_dealloc,
+-    .tp_flags = Py_TPFLAGS_DEFAULT,
++    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
++
++    .tp_traverse = (traverseproc)pointer_traverse,
++    .tp_clear = (inquiry)pointer_clear,
+ };

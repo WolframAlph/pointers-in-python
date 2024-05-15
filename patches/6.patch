@@ -1,0 +1,21 @@
+diff --git a/Python/ceval.c b/Python/ceval.c
+index 3392cd0365..61d94378b5 100644
+--- a/Python/ceval.c
++++ b/Python/ceval.c
+@@ -1573,6 +1573,16 @@ main_loop:
+             DISPATCH();
+         }
+ 
++        case TARGET(UNARY_ADDR): {
++            _PyErr_SetString(tstate, PyExc_NotImplementedError, "UNARY_ADDR not implemented.");
++            goto error;
++        }
++
++        case TARGET(UNARY_DEREF): {
++            _PyErr_SetString(tstate, PyExc_NotImplementedError, "UNARY_DEREF not implemented.");
++            goto error;
++        }
++
+         case TARGET(BINARY_POWER): {
+             PyObject *exp = POP();
+             PyObject *base = TOP();

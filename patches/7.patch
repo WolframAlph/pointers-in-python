@@ -1,0 +1,15 @@
+diff --git a/Python/opcode_targets.h b/Python/opcode_targets.h
+index 538fdbe3e0..d546ec5d05 100644
+--- a/Python/opcode_targets.h
++++ b/Python/opcode_targets.h
+@@ -79,8 +79,8 @@ static void *opcode_targets[256] = {
+     &&TARGET_INPLACE_AND,
+     &&TARGET_INPLACE_XOR,
+     &&TARGET_INPLACE_OR,
+-    &&_unknown_opcode,
+-    &&_unknown_opcode,
++    &&TARGET_UNARY_ADDR,
++    &&TARGET_UNARY_DEREF,
+     &&TARGET_LIST_TO_TUPLE,
+     &&TARGET_RETURN_VALUE,
+     &&TARGET_IMPORT_STAR,

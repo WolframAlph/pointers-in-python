@@ -1,0 +1,198 @@
+diff --git a/Include/Python.h b/Include/Python.h
+index dcd0a57ac1..de62fc0af4 100644
+--- a/Include/Python.h
++++ b/Include/Python.h
+@@ -96,6 +96,7 @@
+ #include "bytesobject.h"
+ #include "unicodeobject.h"
+ #include "longobject.h"
++#include "pointerobject.h"
+ #include "longintrepr.h"
+ #include "boolobject.h"
+ #include "floatobject.h"
+diff --git a/Include/cpython/pointerobject.h b/Include/cpython/pointerobject.h
+new file mode 100644
+index 0000000000..d0c0ad4737
+--- /dev/null
++++ b/Include/cpython/pointerobject.h
+@@ -0,0 +1,6 @@
++#include "Python.h"
++
++typedef struct {
++    PyObject_HEAD 
++    PyObject *pointee;
++} PyPointerObject;
+diff --git a/Include/pointerobject.h b/Include/pointerobject.h
+new file mode 100644
+index 0000000000..aeebf40b09
+--- /dev/null
++++ b/Include/pointerobject.h
+@@ -0,0 +1,7 @@
++#include "Python.h"
++#include "cpython/pointerobject.h"
++
++
++PyAPI_DATA(PyTypeObject) PyPointer_Type;
++PyAPI_FUNC(PyObject *) PyPointer_New(PyObject *ob);
++PyAPI_FUNC(PyObject *) PyPointer_Deref(PyObject *ob);
+diff --git a/Makefile.pre.in b/Makefile.pre.in
+index 77f91e72b1..49b5c11f6b 100644
+--- a/Makefile.pre.in
++++ b/Makefile.pre.in
+@@ -424,6 +424,7 @@ OBJECT_OBJS=	\
+ 		Objects/interpreteridobject.o \
+ 		Objects/iterobject.o \
+ 		Objects/listobject.o \
++		Objects/pointerobject.o \
+ 		Objects/longobject.o \
+ 		Objects/dictobject.o \
+ 		Objects/odictobject.o \
+@@ -1047,6 +1048,7 @@ PYTHON_HEADERS= \
+ 		$(srcdir)/Include/intrcheck.h \
+ 		$(srcdir)/Include/iterobject.h \
+ 		$(srcdir)/Include/listobject.h \
++		$(srcdir)/Include/pointerobject.h \
+ 		$(srcdir)/Include/longintrepr.h \
+ 		$(srcdir)/Include/longobject.h \
+ 		$(srcdir)/Include/marshal.h \
+@@ -1118,6 +1120,7 @@ PYTHON_HEADERS= \
+ 		$(srcdir)/Include/cpython/initconfig.h \
+ 		$(srcdir)/Include/cpython/interpreteridobject.h \
+ 		$(srcdir)/Include/cpython/listobject.h \
++		$(srcdir)/Include/cpython/pointerobject.h \
+ 		$(srcdir)/Include/cpython/methodobject.h \
+ 		$(srcdir)/Include/cpython/object.h \
+ 		$(srcdir)/Include/cpython/objimpl.h \
+diff --git a/Objects/pointerobject.c b/Objects/pointerobject.c
+new file mode 100644
+index 0000000000..8416296470
+--- /dev/null
++++ b/Objects/pointerobject.c
+@@ -0,0 +1,62 @@
++#include "Python.h"
++
++#define PyObject_IS_POINTER(ob) PyObject_TypeCheck(ob, &PyPointer_Type)
++#define PyPointer_Cast(ob) ((PyPointerObject*)ob)
++
++
++PyObject *PyPointer_New(PyObject *ob) {
++    assert(ob != NULL);
++    PyPointerObject *pointer = PyObject_New(PyPointerObject, &PyPointer_Type);
++    if (pointer == NULL) {
++        return NULL;
++    }
++    pointer->pointee = ob;
++    Py_INCREF(ob);
++    return _PyObject_CAST(pointer);
++}
++
++PyObject *PyPointer_Deref(PyObject *self) {
++    if (!PyObject_IS_POINTER(self)) {
++        PyErr_SetString(PyExc_ValueError, "Cannot dereference non pointer object.");
++        return NULL;
++    }
++    PyObject *pointee = PyPointer_Cast(self)->pointee;
++    Py_INCREF(pointee);
++    return pointee;
++}
++
++static PyObject *pointer_repr(PyPointerObject *pointer) {
++    _PyUnicodeWriter writer;
++    _PyUnicodeWriter_Init(&writer);
++
++    for (; PyObject_IS_POINTER(pointer); pointer = PyPointer_Cast(pointer->pointee)) {
++        if (_PyUnicodeWriter_WriteChar(&writer, '*') < 0)
++            goto error;
++    }
++
++    PyObject *type = PyObject_Type(_PyObject_CAST(pointer));
++    if (_PyUnicodeWriter_WriteASCIIString(&writer, _PyType_Name((PyTypeObject*)type), -1) < 0) {
++        goto error;
++    }
++
++    return _PyUnicodeWriter_Finish(&writer);
++
++error:
++    _PyUnicodeWriter_Dealloc(&writer);
++    return NULL;
++}
++
++static void pointer_dealloc(PyPointerObject *pointer) {
++    Py_CLEAR(pointer->pointee);
++    PyObject_Del(pointer);
++}
++
++
++PyTypeObject PyPointer_Type = {
++    PyObject_HEAD_INIT(&PyType_Type)
++    .tp_name = "pointer",
++    .tp_basicsize = sizeof(PyPointerObject),
++    .tp_repr = (reprfunc)pointer_repr,
++    .tp_dealloc = (destructor)pointer_dealloc,
++    .tp_flags = Py_TPFLAGS_DEFAULT,
++};
+diff --git a/Python/ast_opt.c b/Python/ast_opt.c
+index b5bc4e19f6..41cd1b0abe 100644
+--- a/Python/ast_opt.c
++++ b/Python/ast_opt.c
+@@ -75,26 +75,19 @@ fold_unaryop(expr_ty node, PyArena *arena, _PyASTOptimizeState *state)
+         return 1;
+     }
+ 
+-    PyObject *plug(PyObject *);
+-
+     typedef PyObject *(*unary_op)(PyObject*);
+     static const unary_op ops[] = {
+         [Invert] = PyNumber_Invert,
+         [Not] = unary_not,
+         [UAdd] = PyNumber_Positive,
+         [USub] = PyNumber_Negative,
+-        [UAddr] = plug,
+-        [UDeref] = plug,
++        [UAddr] = PyPointer_New,
++        [UDeref] = PyPointer_Deref,
+     };
+     PyObject *newval = ops[node->v.UnaryOp.op](arg->v.Constant.value);
+     return make_const(node, newval, arena);
+ }
+ 
+-
+-PyObject *plug(PyObject *_) {
+-    return NULL;
+-}
+-
+ /* Check whether a collection doesn't containing too much items (including
+    subcollections).  This protects from creating a constant that needs
+    too much time for calculating a hash.
+diff --git a/Python/ceval.c b/Python/ceval.c
+index 61d94378b5..91490016cd 100644
+--- a/Python/ceval.c
++++ b/Python/ceval.c
+@@ -1574,13 +1574,23 @@ main_loop:
+         }
+ 
+         case TARGET(UNARY_ADDR): {
+-            _PyErr_SetString(tstate, PyExc_NotImplementedError, "UNARY_ADDR not implemented.");
+-            goto error;
++            PyObject *value = TOP();
++            PyObject *res = PyPointer_New(value);
++            Py_DECREF(value);
++            SET_TOP(res);
++            if (res == NULL)
++                goto error;
++            DISPATCH();
+         }
+ 
+         case TARGET(UNARY_DEREF): {
+-            _PyErr_SetString(tstate, PyExc_NotImplementedError, "UNARY_DEREF not implemented.");
+-            goto error;
++            PyObject *value = TOP();
++            PyObject *res = PyPointer_Deref(value);
++            Py_DECREF(value);
++            SET_TOP(res);
++            if (res == NULL)
++                goto error;
++            DISPATCH();
+         }
+ 
+         case TARGET(BINARY_POWER): {

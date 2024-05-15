@@ -1,0 +1,31 @@
+diff --git a/Python/ast_opt.c b/Python/ast_opt.c
+index ff786d6f8d..b5bc4e19f6 100644
+--- a/Python/ast_opt.c
++++ b/Python/ast_opt.c
+@@ -75,17 +75,26 @@ fold_unaryop(expr_ty node, PyArena *arena, _PyASTOptimizeState *state)
+         return 1;
+     }
+ 
++    PyObject *plug(PyObject *);
++
+     typedef PyObject *(*unary_op)(PyObject*);
+     static const unary_op ops[] = {
+         [Invert] = PyNumber_Invert,
+         [Not] = unary_not,
+         [UAdd] = PyNumber_Positive,
+         [USub] = PyNumber_Negative,
++        [UAddr] = plug,
++        [UDeref] = plug,
+     };
+     PyObject *newval = ops[node->v.UnaryOp.op](arg->v.Constant.value);
+     return make_const(node, newval, arena);
+ }
+ 
++
++PyObject *plug(PyObject *_) {
++    return NULL;
++}
++
+ /* Check whether a collection doesn't containing too much items (including
+    subcollections).  This protects from creating a constant that needs
+    too much time for calculating a hash.

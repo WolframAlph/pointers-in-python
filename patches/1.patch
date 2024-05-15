@@ -1,0 +1,24 @@
+diff --git a/Grammar/Tokens b/Grammar/Tokens
+index 9de2da5d15..b7acb29815 100644
+--- a/Grammar/Tokens
++++ b/Grammar/Tokens
+@@ -53,6 +53,7 @@ ATEQUAL                 '@='
+ RARROW                  '->'
+ ELLIPSIS                '...'
+ COLONEQUAL              ':='
++DOLLAR                  '$'
+ 
+ OP
+ AWAIT
+diff --git a/Grammar/python.gram b/Grammar/python.gram
+index 334a7f56f0..0e609eb44f 100644
+--- a/Grammar/python.gram
++++ b/Grammar/python.gram
+@@ -452,6 +452,7 @@ factor[expr_ty] (memo):
+     | '+' a=factor { _Py_UnaryOp(UAdd, a, EXTRA) }
+     | '-' a=factor { _Py_UnaryOp(USub, a, EXTRA) }
+     | '~' a=factor { _Py_UnaryOp(Invert, a, EXTRA) }
++    | '$' a=factor { _Py_UnaryOp(Invert, a, EXTRA) }
+     | power
+ power[expr_ty]:
+     | a=await_primary '**' b=factor { _Py_BinOp(a, Pow, b, EXTRA) }

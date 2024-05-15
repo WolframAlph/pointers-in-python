@@ -1,0 +1,27 @@
+diff --git a/Grammar/python.gram b/Grammar/python.gram
+index 0e609eb44f..24c2c2f46e 100644
+--- a/Grammar/python.gram
++++ b/Grammar/python.gram
+@@ -452,7 +452,8 @@ factor[expr_ty] (memo):
+     | '+' a=factor { _Py_UnaryOp(UAdd, a, EXTRA) }
+     | '-' a=factor { _Py_UnaryOp(USub, a, EXTRA) }
+     | '~' a=factor { _Py_UnaryOp(Invert, a, EXTRA) }
+-    | '$' a=factor { _Py_UnaryOp(Invert, a, EXTRA) }
++    | '$' a=factor { _Py_UnaryOp(UDeref, a, EXTRA) }
++    | '&' a=factor { _Py_UnaryOp(UAddr, a, EXTRA) }
+     | power
+ power[expr_ty]:
+     | a=await_primary '**' b=factor { _Py_BinOp(a, Pow, b, EXTRA) }
+diff --git a/Parser/Python.asdl b/Parser/Python.asdl
+index 889712b4b3..60fcc99eb3 100644
+--- a/Parser/Python.asdl
++++ b/Parser/Python.asdl
+@@ -97,7 +97,7 @@ module Python
+     operator = Add | Sub | Mult | MatMult | Div | Mod | Pow | LShift
+                  | RShift | BitOr | BitXor | BitAnd | FloorDiv
+ 
+-    unaryop = Invert | Not | UAdd | USub
++    unaryop = Invert | Not | UAdd | USub | UAddr | UDeref
+ 
+     cmpop = Eq | NotEq | Lt | LtE | Gt | GtE | Is | IsNot | In | NotIn
+ 

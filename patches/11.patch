@@ -1,0 +1,83 @@
+diff --git a/Objects/pointerobject.c b/Objects/pointerobject.c
+index ada9a8a2d3..27fee9c1f2 100644
+--- a/Objects/pointerobject.c
++++ b/Objects/pointerobject.c
+@@ -3,6 +3,21 @@
+ #define PyObject_IS_POINTER(ob) PyObject_TypeCheck(ob, &PyPointer_Type)
+ #define PyPointer_Cast(ob) ((PyPointerObject*)ob)
+ 
++#define PyPointer_CheckIndex(item, ret, err) do { \
++   if (!PyLong_Check(item)) { \
++        PyErr_Format(PyExc_TypeError, \
++                    "pointer indices must be integers, not %.200s", Py_TYPE(item)->tp_name); \
++        return err; \
++    } \
++    ret = PyLong_AsLong(item); \
++    if (i == -1 && PyErr_Occurred()) { \
++        return err; \          
++    } \
++    if (i < 0) { \
++        PyErr_Format(PyExc_IndexError, "index can not be negative"); \
++        return err; \
++    } \
++} while (0)
+ 
+ PyObject *PyPointer_New(PyObject *ob) {
+     assert(ob != NULL);
+@@ -65,6 +80,47 @@ static int pointer_clear(PyPointerObject *self) {
+     return 0;
+ }
+ 
++static PyObject *pointer_subscript(PyPointerObject *self, PyObject *item) {
++    long i;
++    PyPointer_CheckIndex(item, i, NULL);
++    return PyLong_FromUnsignedLong(*((unsigned char*)self->pointee + i));
++}
++
++static int pointer_ass_subscript(PyPointerObject *self, PyObject *key, PyObject *value) {
++    long i;
++    PyPointer_CheckIndex(key, i, -1);
++    if (!PyLong_Check(value)) {
++        PyErr_Format(PyExc_TypeError,
++                    "%.200s object cannot be interpreted as integer", Py_TYPE(key)->tp_name); 
++        return -1;
++    }
++    long v = PyLong_AsLong(value);
++    if (v == -1 && PyErr_Occurred()) {
++        return -1;
++    }
++    if (!(v >= 0 && v <= 255)) {
++        PyErr_Format(PyExc_ValueError,
++                    "%d is out of bounds 0, 255", v); 
++        return -1;
++    }
++    *((char*)self->pointee + i) = (char)v;
++    return 0;
++}
++
++static PyMappingMethods pointer_as_mapping = {
++    .mp_subscript = (binaryfunc)pointer_subscript,
++    .mp_ass_subscript = (objobjargproc)pointer_ass_subscript
++};
++
++static PyObject *pointer_bytes(PyPointerObject *self, PyObject *_) {
++    return PyBytes_FromStringAndSize((char*)self->pointee, (Py_ssize_t)_PySys_GetSizeOf(self->pointee));
++}
++
++static PyMethodDef pointer_methods[] = {
++    {"bytes", (PyCFunction)pointer_bytes, METH_NOARGS, ""},
++    {NULL, NULL}
++};
++
+ PyTypeObject PyPointer_Type = {
+     PyObject_HEAD_INIT(&PyType_Type)
+     .tp_name = "pointer",
+@@ -75,4 +131,8 @@ PyTypeObject PyPointer_Type = {
+ 
+     .tp_traverse = (traverseproc)pointer_traverse,
+     .tp_clear = (inquiry)pointer_clear,
++
++    .tp_methods = pointer_methods,
++    .tp_as_mapping = &pointer_as_mapping,
++    .tp_getattro = PyObject_GenericGetAttr
+ };

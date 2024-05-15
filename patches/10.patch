@@ -1,0 +1,15 @@
+diff --git a/Objects/pointerobject.c b/Objects/pointerobject.c
+index c4d9833a12..ada9a8a2d3 100644
+--- a/Objects/pointerobject.c
++++ b/Objects/pointerobject.c
+@@ -49,8 +49,10 @@ error:
+ 
+ static void pointer_dealloc(PyPointerObject *pointer) {
+     PyObject_GC_UnTrack(pointer);
++    Py_TRASHCAN_BEGIN(pointer, pointer_dealloc);
+     Py_CLEAR(pointer->pointee);
+     PyObject_GC_Del(pointer);
++    Py_TRASHCAN_END;
+ }
+ 
+ static int pointer_traverse(PyPointerObject *o, visitproc visit, void *arg) {
