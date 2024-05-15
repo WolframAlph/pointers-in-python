@@ -1,7 +1,8 @@
 # pointers-in-python
 
 git clone https://github.com/python/cpython \
-cd cpython
+cd cpython \
+git checkout v3.9.0
 
 ## docker setup
 docker pull wolframalph/cpython-env \
