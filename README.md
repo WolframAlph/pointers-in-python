@@ -1,6 +1,6 @@
 # pointers-in-python
 
-git clone https://github.com/python/cpython \
+git clone --depth 1 -v v3.9.0 https://github.com/python/cpython \
 cd cpython \
 git checkout v3.9.0
 
